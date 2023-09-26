@@ -1,0 +1,26 @@
+Pygments==2.6.1
+tqdm==4.46.0
+opencv_python==4.4.0.42
+sortedcontainers==2.1.0
+Pillow==8.2.0
+PyYAML==5.4.1
+scikit_learn>=0.24.2
+tensorboardX
+easydict
+prettytable
+chumpy
+pytorch-metric-learning                         # For one-hot action recognition
+smplx[all]                                      # For mesh recovery
+decord>=0.6.0
+matplotlib
+mmcv-full==1.5.0
+mmdet
+mmpose
+moviepy
+numpy>=1.19.5
+opencv-contrib-python
+pymemcache
+scipy
+imageio-ffmpeg
+roma
+ipdb
