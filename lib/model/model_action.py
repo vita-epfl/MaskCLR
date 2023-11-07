@@ -216,7 +216,7 @@ class ActionNet(nn.Module):
         else:
             raise Exception('Version Error.')
         
-    def forward(self, x, j_importances=None):
+    def forward(self, x):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
@@ -224,7 +224,7 @@ class ActionNet(nn.Module):
 
         if self.reshape_input:
             x = x.reshape(N*M, T, J, C)        
-        feat, attn_maps = self.backbone.get_representation(x, j_importances)
+        feat, attn_maps = self.backbone.get_representation(x)
 
         
 

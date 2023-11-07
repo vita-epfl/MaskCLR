@@ -111,6 +111,7 @@ def parse_args():
     parser.add_argument('--msk_path_start_epoch', default=300, type=float)
     parser.add_argument('--msk_type', default='', type=str)
     parser.add_argument('--cl_type', default='tcl', type=str)
+    parser.add_argument('--not_strict', default=True, action="store_false")
     opts = parser.parse_args()
     return opts
 
@@ -130,7 +131,9 @@ def load_checkpoint (model, chk_filename, clean=False):
     else:
         new_state_dict = state_dict
 
-    model.load_state_dict(new_state_dict, strict=True)
+    #print(opts.not_strict)
+
+    model.load_state_dict(new_state_dict, strict=opts.not_strict)
 
     return model, checkpoint
 
@@ -503,10 +506,10 @@ def train_with_config(args, opts):
           'prefetch_factor': 4,
           'persistent_workers': True
     }
-    data_path = '/home/osabdelfattah/MaskCLR/datasets/ntu60/%s.pkl' % args.dataset
+    data_path = '/home/abdelfat/MaskCLR/datasets/ntu60/%s.pkl' % args.dataset
 
     if not opts.evaluate:
-        ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, \
+        ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, \
                                    random_move=args.random_move, scale_range=args.scale_range_train, of=opts.of, chunk=opts.chunk)
         train_loader = DataLoader(ntu60_xsub_train, **trainloader_params, drop_last=True)
     
@@ -521,7 +524,7 @@ def train_with_config(args, opts):
         #checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)
         #model.load_state_dict(checkpoint['model'], strict=True)
 
-        model, checkpoint = load_checkpoint(model, chk_filename, clean=True)
+        model.model, checkpoint = load_checkpoint(model.model, chk_filename, clean=True)
         #for i in range(3):
         #    model.module.model_branches[i], _ = load_checkpoint(model.module.model_branches[i], chk_filename, clean=True)
     

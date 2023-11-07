@@ -9,8 +9,8 @@ lr_backbone: 0.0001
 lr_head: 0.001
 weight_decay: 0.01
 lr_decay: 0.99
-ccl: 1
-scl: 1
+ccl: 0.5
+scl: 0.5
 
 #    batch_size |   ccl |   depth | head_version   |   hidden_dim |   lr_backbone |     lr_head |   scl
 # Model       4 |  2    |       5 | series         |         1024 |   0.000600529 | 0.00488126  |  2 
