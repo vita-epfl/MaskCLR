@@ -20,11 +20,20 @@ from lib.utils.tools import *
 from lib.utils.learning import *
 from lib.model.loss import *
 from lib.data.dataset_action import NTURGBD
-from lib.model.model_action import ActionNet
+from lib.model.model_action import *
 
 random.seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
+
+"""
+python /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/train_org_mb.py \
+    --config /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/configs/action/MB_train_NTU60_xsub.yaml \
+    --checkpoint /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/checkpoint/action/MB_train_NTU60_xsub \
+    --print_freq 1
+
+"""
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -35,6 +44,14 @@ def parse_args():
     parser.add_argument('-e', '--evaluate', default='', type=str, metavar='FILENAME', help='checkpoint to evaluate (file name)')
     parser.add_argument('-freq', '--print_freq', type=int,default=100)
     parser.add_argument('-ms', '--selection', default='latest_epoch.bin', type=str, metavar='FILENAME', help='checkpoint to finetune (file name)')
+    
+    parser.add_argument('--of', default=False, action="store_true", help='add temporal pooling')
+    parser.add_argument('--chunk', default=None, type=int)
+    parser.add_argument('--mask_th', default=None, type=float)
+    parser.add_argument('--msk_path_start_epoch', default=300, type=float)
+    parser.add_argument('--msk_type', default='', type=str)
+    parser.add_argument('--cl_type', default='tcl', type=str)
+    parser.add_argument('--not_strict', default=True, action="store_false")
     opts = parser.parse_args()
     return opts
 
@@ -53,6 +70,7 @@ def validate(test_loader, model, criterion):
                 batch_gt = batch_gt.cuda()
                 batch_input = batch_input.cuda()
             output, _,_,_ = model(batch_input)    # (N, num_classes)
+            output = output[0]
             loss = criterion(output, batch_gt)
 
             # update metric
@@ -95,7 +113,10 @@ def train_with_config(args, opts):
             model_backbone = load_pretrained_weights(model_backbone, checkpoint)
     if args.partial_train:
         model_backbone = partial_train_layers(model_backbone, args.partial_train)
-    model = ActionNet(backbone=model_backbone, dim_rep=args.dim_rep, num_classes=args.action_classes, dropout_ratio=args.dropout_ratio, version=args.model_version, hidden_dim=args.hidden_dim, num_joints=args.num_joints)
+    #model = ActionNet(backbone=model_backbone, dim_rep=args.dim_rep, num_classes=args.action_classes, dropout_ratio=args.dropout_ratio, version=args.model_version, hidden_dim=args.hidden_dim, num_joints=args.num_joints)
+    model = MaskCLRv2(backbone=model_backbone,dim_rep=args.dim_rep, num_classes=args.action_classes,\
+                            dropout_ratio=args.dropout_ratio, version=args.model_version, hidden_dim=args.hidden_dim,\
+                                num_joints=args.num_joints, arch=args.head_version, mask_th=opts.mask_th)
     criterion = torch.nn.CrossEntropyLoss()
     if torch.cuda.is_available():
         model = nn.DataParallel(model)
@@ -113,7 +134,8 @@ def train_with_config(args, opts):
           'num_workers': 8,
           'pin_memory': True,
           'prefetch_factor': 4,
-          'persistent_workers': True
+          'persistent_workers': True,
+          'drop_last': True
     }
     testloader_params = {
           'batch_size': args.batch_size,
@@ -121,9 +143,10 @@ def train_with_config(args, opts):
           'num_workers': 8,
           'pin_memory': True,
           'prefetch_factor': 4,
-          'persistent_workers': True
+          'persistent_workers': True,
+          'drop_last': True
     }
-    data_path = '/home/abdelfat/MaskCLR/datasets/ntu60/%s.pkl' % args.dataset
+    data_path = '/mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/datasets/ntu60/%s.pkl' % args.dataset
     ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, random_move=args.random_move, scale_range=args.scale_range_train)
     ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, random_move=False, scale_range=args.scale_range_test)
 
@@ -140,9 +163,16 @@ def train_with_config(args, opts):
         model.load_state_dict(checkpoint['model'], strict=True)
     
     if not opts.evaluate:
+        # optimizer = optim.AdamW(
+        #     [     {"params": filter(lambda p: p.requires_grad, model.module.backbone.parameters()), "lr": args.lr_backbone},
+        #           {"params": filter(lambda p: p.requires_grad, model.module.head.parameters()), "lr": args.lr_head},
+        #     ],      lr=args.lr_backbone, 
+        #             weight_decay=args.weight_decay
+        # )
+
         optimizer = optim.AdamW(
-            [     {"params": filter(lambda p: p.requires_grad, model.module.backbone.parameters()), "lr": args.lr_backbone},
-                  {"params": filter(lambda p: p.requires_grad, model.module.head.parameters()), "lr": args.lr_head},
+            [     {"params": filter(lambda p: p.requires_grad, model.module.model.backbone.parameters()), "lr": args.lr_backbone},
+                  {"params": filter(lambda p: p.requires_grad, model.module.model.head.parameters()), "lr": args.lr_head},
             ],      lr=args.lr_backbone, 
                     weight_decay=args.weight_decay
         )
@@ -180,6 +210,7 @@ def train_with_config(args, opts):
                     batch_gt = batch_gt.cuda()
                     batch_input = batch_input.cuda()
                 output, _,_,_ = model(batch_input) # (N, num_classes)
+                output = output[0]
                 optimizer.zero_grad()
                 loss_train = criterion(output, batch_gt)
                 losses_train.update(loss_train.item(), batch_size)

@@ -371,7 +371,7 @@ class ActionNetv2(nn.Module):
         self.head = ActionHeadClassification(dropout_ratio=dropout_ratio, dim_rep=dim_rep, \
                                                 num_classes=num_classes, num_joints=num_joints, cam=cam)
         
-    def forward(self, x, j_importances=None):
+    def forward(self, x, j_importances=None, mask_drop=False):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
@@ -379,7 +379,7 @@ class ActionNetv2(nn.Module):
 
         if self.reshape_input:
             x = x.reshape(N*M, T, J, C)        
-        feat, attn_maps = self.backbone.get_representation(x, j_importances)
+        feat, attn_maps = self.backbone.get_representation(x, j_importances, mask_drop=mask_drop)
 
         feat = feat.reshape([N, M, T, self.feat_J, -1])      # (N, M, T, J, C)
 
@@ -392,6 +392,8 @@ class MaskCLRv2(nn.Module):
                  version='class', hidden_dim=2048, num_joints=17, cam=False, arch= None, mask_th=0.2):
         super(MaskCLRv2, self).__init__()
         
+        
+
         self.n_branches = 2
 
         self.mask_th = mask_th
@@ -399,7 +401,7 @@ class MaskCLRv2(nn.Module):
                        dropout_ratio=dropout_ratio, version=version, hidden_dim=hidden_dim, num_joints=num_joints, \
                         cam=cam, arch= arch)
 
-    def forward(self, inp, two_branches=False):
+    def forward(self, inp, two_branches=False, mask_drop=False):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
@@ -411,7 +413,7 @@ class MaskCLRv2(nn.Module):
         masked_inps = []
 
         N, M, T, J, C = inp.shape
-        mask = torch.ones(N, M, T, J, C).cuda()
+        #mask = torch.ones(N, M, T, J, C).cuda()
 
         x = inp
 
@@ -427,7 +429,7 @@ class MaskCLRv2(nn.Module):
             return out, temp_feature1, temp_feature2, j_importance#, masked_inps
 
         #print("j_importance.shape: ", j_importance.shape)
-        temp_out, temp_feature1, temp_feature2, j_importance = self.model(x, j_importance)
+        temp_out, temp_feature1, temp_feature2, j_importance = self.model(x, j_importance, mask_drop=mask_drop)
 
         masked_inps.append(x)
         out.append(temp_out) #.unsqueeze(-1)

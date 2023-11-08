@@ -24,17 +24,10 @@ from lib.model.model_action import *
 
 from loss import SupConLoss
 
-import cv2
-from MulticoreTSNE import MulticoreTSNE as TSNE
-import pickle
-
-from matplotlib import pyplot as plt
 
 random.seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
-
-torch.autograd.set_detect_anomaly(True)
 
 """ 
 
@@ -48,6 +41,16 @@ python train_maskclr.py \
     --msk_type tm \
     --cl_type cl \
     --chunk 100 
+
+python /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/train_maskclr.py \
+    --config /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/configs/mb/maskclrv2_train_NTU60_xsub.yaml \
+    --checkpoint /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/checkpoint/action/maskclrv2_scratch \
+    --print_freq 100 \
+    --msk_path_start_epoch 100 \
+    --mask_th 0.2 \
+    --msk_type tm \
+    --cl_type cl
+
 
 python train_maskclr.py \
     --config configs/mb/maskclrv2_train_NTU60_xsub.yaml \
@@ -111,7 +114,11 @@ def parse_args():
     parser.add_argument('--msk_path_start_epoch', default=300, type=float)
     parser.add_argument('--msk_type', default='', type=str)
     parser.add_argument('--cl_type', default='tcl', type=str)
-    parser.add_argument('--not_strict', default=True, action="store_false")
+    parser.add_argument('--ce_type', default='ce', type=str)
+    parser.add_argument('--not_strict', default=True, action="store_false") 
+    parser.add_argument('--mask_drop', default=False, action="store_true")
+    parser.add_argument('--batch_size_override', default=None, type=int)
+
     opts = parser.parse_args()
     return opts
 
@@ -305,13 +312,13 @@ def validate(test_loader, model, criterion, log_file_name, class_contrastive_los
         end = time.time()
         for idx, (batch_input, batch_gt) in (enumerate(test_loader)):
             
-            batch_input_pure, batch_input_noisy = batch_input
+            batch_input_pure = batch_input
 
             batch_size = len(batch_input_pure)    
             #if torch.cuda.is_available():
             batch_gt = batch_gt.cuda()
             batch_input_pure = batch_input_pure.cuda()
-            batch_input_noisy = batch_input_noisy.cuda()
+            #batch_input_noisy = batch_input_noisy.cuda()
 
             #outputs, features_sc, features_cc, j_importances, branch_inps = model(batch_input_pure, batch_input_noisy)
             #output, j_importance, branch_inp = outputs[0], j_importances[0], branch_inps[0]
@@ -319,11 +326,14 @@ def validate(test_loader, model, criterion, log_file_name, class_contrastive_los
             sc_loss = cc_loss = ce_loss = 0
 
             if epoch >= opts.msk_path_start_epoch:
-                outputs, features_sc, features_cc, j_importances, branch_inps = model(batch_input_pure, two_branches=True)
+                outputs, features_sc, features_cc, j_importances, branch_inps = model(batch_input_pure, two_branches=True, mask_drop=opts.mask_drop)
 
                 #ce_loss = (criterion(outputs[0], batch_gt) + criterion(outputs[1], batch_gt))/2
                 #ce_loss = adjusted_cross_entropy_loss(outputs[0], batch_gt)
-                ce_loss = criterion(outputs[0], batch_gt)
+                if opts.ce_type == "avgce" :
+                    ce_loss = (criterion(outputs[0], batch_gt) + criterion(outputs[1], batch_gt))/2
+                else:
+                    ce_loss = criterion(outputs[0], batch_gt)
 
                 if opts.cl_type == "tcl":
                     #masked_class_rep = torch.cat([features_cc[0].unsqueeze(1), features_cc[1].unsqueeze(1)], dim=1)
@@ -402,28 +412,6 @@ def validate(test_loader, model, criterion, log_file_name, class_contrastive_los
             #break
     return total_losses.avg, top1.avg, top5.avg
 
-def vis_latent_space(all_features, all_targets, file_name):
-    embeddings_dic = {}
-
-    plt.figure(figsize=(20, 16))
-    embeddings = TSNE(n_jobs=8).fit_transform(all_features)  #(M,T,J,C)
-    vis_x = embeddings[:, 0]
-    vis_y = embeddings[:, 1]
-
-    embeddings_dic['x'] = vis_x
-    embeddings_dic['y'] = vis_x
-    embeddings_dic['targets'] = all_targets
-
-    with open(file_name + '.pickle', 'wb') as handle:
-        pickle.dump(embeddings_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    plt.scatter(vis_x, vis_y, c=all_targets, cmap=plt.cm.get_cmap("jet", 60), marker='.')
-
-    plt.colorbar(ticks=range(60))
-    plt.clim(0,60)
-    #save_path = 'vis_all.png'
-    plt.savefig(file_name + '.png', bbox_inches="tight")
-
 def adjusted_cross_entropy_loss(logits, target):
     # Apply the softmax function to the logits
     probabilities = F.softmax(logits, dim=1)
@@ -444,6 +432,8 @@ def adjusted_cross_entropy_loss(logits, target):
 def train_with_config(args, opts):
     print(args)
     print(opts)
+
+    args.batch_size = opts.batch_size_override if opts.batch_size_override is not None else args.batch_size
 
     log_file_name = opts.checkpoint + "/logs"+ ".txt"
 
@@ -506,10 +496,15 @@ def train_with_config(args, opts):
           'prefetch_factor': 4,
           'persistent_workers': True
     }
-    data_path = '/home/abdelfat/MaskCLR/datasets/ntu60/%s.pkl' % args.dataset
+    data_path = '/mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/datasets/ntu60/%s.pkl' % args.dataset
 
     if not opts.evaluate:
-        ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, \
+        
+        train_split = '_train'
+
+        train_split = '_val' if opts.of else train_split
+
+        ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+train_split, n_frames=args.clip_len, \
                                    random_move=args.random_move, scale_range=args.scale_range_train, of=opts.of, chunk=opts.chunk)
         train_loader = DataLoader(ntu60_xsub_train, **trainloader_params, drop_last=True)
     
@@ -580,38 +575,30 @@ def train_with_config(args, opts):
             iters = len(train_loader)
 
             
+            sc_loss = cc_loss  = 0
 
             for idx, (batch_input, batch_gt) in (enumerate(train_loader)):    # (N, 2, T, 17, 3)
                 data_time.update(time.time() - end)
 
-                batch_input_pure, batch_input_noisy = batch_input
+                batch_input_pure = batch_input
 
                 #print(batch_input_pure.shape)
                 batch_size = len(batch_input_pure)
                 #if torch.cuda.is_available():
                 batch_gt = batch_gt.cuda()
                 batch_input_pure = batch_input_pure.cuda()
-                batch_input_noisy = batch_input_noisy.cuda()
-
-
-                #output = model(batch_input_pure) # (N, num_classes)
-
+                #batch_input_noisy = batch_input_noisy.cuda()
                 
-                #output, j_importance, branch_inp = outputs[0], j_importances[0], branch_inps[0]
-
-                
-
-                #output_ce = (outputs[0] + outputs[1] + outputs[2]) / 3
-
-                
-                sc_loss = cc_loss = ce_loss = 0
 
                 if epoch >= opts.msk_path_start_epoch:
-                    outputs, features_sc, features_cc, j_importances, branch_inps = model(batch_input_pure, two_branches=True)
-
+                    outputs, features_sc, features_cc, j_importances, branch_inps = model(batch_input_pure, two_branches=True, mask_drop=opts.mask_drop)
+                    optimizer.zero_grad()
                     #ce_loss = (criterion(outputs[0], batch_gt) + criterion(outputs[1], batch_gt))/2
                     #ce_loss = adjusted_cross_entropy_loss(outputs[0], batch_gt)
-                    ce_loss = criterion(outputs[0], batch_gt)
+                    if opts.ce_type == "avgce" :
+                        ce_loss = (criterion(outputs[0], batch_gt) + criterion(outputs[1], batch_gt))/2
+                    else:
+                        ce_loss = criterion(outputs[0], batch_gt)
 
                     if opts.cl_type == "tcl":
                         #masked_class_rep = torch.cat([features_cc[0].unsqueeze(1), features_cc[1].unsqueeze(1)], dim=1)
@@ -654,11 +641,12 @@ def train_with_config(args, opts):
                 
                 else:
                     outputs, _, _, _= model(batch_input_pure)
+                    optimizer.zero_grad()
 
                     ce_loss = criterion(outputs[0], batch_gt)
 
 
-                optimizer.zero_grad()
+                
 
                 total_loss = ce_loss + args.ccl*cc_loss + args.scl*sc_loss
 
@@ -727,7 +715,7 @@ def train_with_config(args, opts):
             # Save latest checkpoint.
 
             acc_name = ""
-            if test_top1 > 90:
+            if test_top1 > 92:
                 acc_name = '_' + str(round(test_top1.item(),2))
 
             chk_path = os.path.join(opts.checkpoint, 'latest_epoch%s.bin' % (acc_name).format(epoch))
