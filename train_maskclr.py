@@ -51,6 +51,18 @@ python train_maskclr.py \
 
 python train_maskclr.py \
     --config configs/mb/maskclrv2_train_NTU60_xsub.yaml \
+    --resume checkpoint/best_epoch_xsub_org.bin \
+    --checkpoint checkpoint/smart_masking_drop \
+    --print_freq 1 \
+    --msk_path_start_epoch 0 \
+    --mask_th 0.2 \
+    --msk_type tm \
+    --cl_type cl \
+    --chunk 100 \
+    --not_strict
+
+python train_maskclr.py \
+    --config configs/mb/maskclrv2_train_NTU60_xsub.yaml \
     --resume checkpoint/smart_masking/latest_epoch.bin \
     --checkpoint checkpoint/smart_masking \
     --print_freq 1 \
@@ -111,6 +123,7 @@ def parse_args():
     parser.add_argument('--msk_path_start_epoch', default=300, type=float)
     parser.add_argument('--msk_type', default='', type=str)
     parser.add_argument('--cl_type', default='tcl', type=str)
+    parser.add_argument('--not_strict', default=True, action="store_false")
     opts = parser.parse_args()
     return opts
 
@@ -130,7 +143,7 @@ def load_checkpoint (model, chk_filename, clean=False):
     else:
         new_state_dict = state_dict
 
-    model.load_state_dict(new_state_dict, strict=True)
+    model.load_state_dict(new_state_dict, strict=opts.not_strict)
 
     return model, checkpoint
 
@@ -521,7 +534,7 @@ def train_with_config(args, opts):
         #checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)
         #model.load_state_dict(checkpoint['model'], strict=True)
 
-        model, checkpoint = load_checkpoint(model, chk_filename, clean=True)
+        model.model, checkpoint = load_checkpoint(model.model, chk_filename, clean=True)
         #for i in range(3):
         #    model.module.model_branches[i], _ = load_checkpoint(model.module.model_branches[i], chk_filename, clean=True)
     
@@ -604,7 +617,8 @@ def train_with_config(args, opts):
                 sc_loss = cc_loss = ce_loss = 0
 
                 if epoch >= opts.msk_path_start_epoch:
-                    outputs, features_sc, features_cc, j_importances, branch_inps = model(batch_input_pure, two_branches=True)
+                    outputs, features_sc, features_cc, j_importances, branch_inps = model(batch_input_pure, two_branches=True, mask_drop=True)
+                    optimizer.zero_grad()
 
                     #ce_loss = (criterion(outputs[0], batch_gt) + criterion(outputs[1], batch_gt))/2
                     #ce_loss = adjusted_cross_entropy_loss(outputs[0], batch_gt)
@@ -651,11 +665,12 @@ def train_with_config(args, opts):
                 
                 else:
                     outputs, _, _, _= model(batch_input_pure)
+                    optimizer.zero_grad()
 
                     ce_loss = criterion(outputs[0], batch_gt)
 
 
-                optimizer.zero_grad()
+                
 
                 total_loss = ce_loss + args.ccl*cc_loss + args.scl*sc_loss
 

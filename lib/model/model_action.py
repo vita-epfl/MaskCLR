@@ -216,15 +216,17 @@ class ActionNet(nn.Module):
         else:
             raise Exception('Version Error.')
         
-    def forward(self, x, j_importances=None):
+    def forward(self, x):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
         N, M, T, J, C = x.shape
 
         if self.reshape_input:
-            x = x.reshape(N*M, T, J, C)        
-        feat, attn_maps = self.backbone.get_representation(x, j_importances)
+            x = x.reshape(N*M, T, J, C)      
+
+        #print(x.shape)  
+        feat, attn_maps = self.backbone.get_representation(x)
 
         
 
@@ -320,7 +322,7 @@ class MaskCLR(nn.Module):
         
         return mask
 
-    def forward(self, inp, inp_n):
+    def forward(self, inp):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
@@ -371,15 +373,17 @@ class ActionNetv2(nn.Module):
         self.head = ActionHeadClassification(dropout_ratio=dropout_ratio, dim_rep=dim_rep, \
                                                 num_classes=num_classes, num_joints=num_joints, cam=cam)
         
-    def forward(self, x, j_importances=None):
+    def forward(self, x, j_importances=None, mask_drop=False):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
         N, M, T, J, C = x.shape
 
         if self.reshape_input:
-            x = x.reshape(N*M, T, J, C)        
-        feat, attn_maps = self.backbone.get_representation(x, j_importances)
+            x = x.reshape(N*M, T, J, C)  
+
+        #print(x.shape, j_importances)      
+        feat, attn_maps = self.backbone.get_representation(x, j_importances, mask_drop=mask_drop)
 
         feat = feat.reshape([N, M, T, self.feat_J, -1])      # (N, M, T, J, C)
 
@@ -399,7 +403,7 @@ class MaskCLRv2(nn.Module):
                        dropout_ratio=dropout_ratio, version=version, hidden_dim=hidden_dim, num_joints=num_joints, \
                         cam=cam, arch= arch)
 
-    def forward(self, inp, two_branches=False):
+    def forward(self, inp, two_branches=False, mask_drop=False):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
@@ -410,8 +414,8 @@ class MaskCLRv2(nn.Module):
         j_importances = []
         masked_inps = []
 
-        N, M, T, J, C = inp.shape
-        mask = torch.ones(N, M, T, J, C).cuda()
+        #N, M, T, J, C = inp.shape
+        #mask = torch.ones(N, M, T, J, C).cuda()
 
         x = inp
 
@@ -427,7 +431,7 @@ class MaskCLRv2(nn.Module):
             return out, temp_feature1, temp_feature2, j_importance#, masked_inps
 
         #print("j_importance.shape: ", j_importance.shape)
-        temp_out, temp_feature1, temp_feature2, j_importance = self.model(x, j_importance)
+        temp_out, temp_feature1, temp_feature2, j_importance = self.model(x, j_importance, mask_drop=mask_drop)
 
         masked_inps.append(x)
         out.append(temp_out) #.unsqueeze(-1)
