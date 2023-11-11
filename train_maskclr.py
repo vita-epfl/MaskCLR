@@ -76,6 +76,17 @@ python train_maskclr.py \
     --chunk 100 
 
 
+python train_maskclr.py \
+    --config configs/mb/mamp_train_NTU60_xsub.yaml \
+    --checkpoint checkpoint/mamp \
+    --print_freq 1 \
+    --msk_path_start_epoch 10 \
+    --mask_th 0.2 \
+    --msk_type tm \
+    --cl_type cl \
+    --chunk 100 
+
+
     
 
 CUDA_VISIBLE_DEVICES=0 python train_maskclr.py \
@@ -130,8 +141,6 @@ def parse_args():
     parser.add_argument('--not_strict', default=True, action="store_false") 
     parser.add_argument('--mask_drop', default=False, action="store_true")
     parser.add_argument('--batch_size_override', default=None, type=int)
-
-    parser.add_argument('--not_strict', default=True, action="store_false")
     opts = parser.parse_args()
     return opts
 
@@ -509,7 +518,7 @@ def train_with_config(args, opts):
           'prefetch_factor': 4,
           'persistent_workers': True
     }
-    data_path = '/mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/datasets/ntu60/%s.pkl' % args.dataset
+    data_path = '/home/osabdelfattah/MaskCLR/datasets/ntu60/%s.pkl' % args.dataset
 
     if not opts.evaluate:
         
