@@ -29,10 +29,10 @@ dropout_ratio: 0.5
 head_version: base
 
 # Data
-dataset: ntu60_hrnet #ntu60_all  #ntu60_hrnet #ntu60_openpifpaf_HQ_fixed4 #ntu60_openpifpaf_HQ
-data_split: xsub
+dataset: ntu120_hrnet #ntu60_all  #ntu60_hrnet #ntu60_openpifpaf_HQ_fixed4 #ntu60_openpifpaf_HQ
+data_split: xset
 clip_len: 243
-action_classes: 60
+action_classes: 120
 
 # Augmentation
 random_move: True
