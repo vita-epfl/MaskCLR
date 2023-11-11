@@ -518,7 +518,7 @@ def train_with_config(args, opts):
           'prefetch_factor': 4,
           'persistent_workers': True
     }
-    data_path = '/home/osabdelfattah/MaskCLR/datasets/ntu60/%s.pkl' % args.dataset
+    data_path = '/home/abdelfat/TCL/datasets/ntu60/Frames/%s.pkl' % args.dataset
 
     if not opts.evaluate:
         
@@ -568,7 +568,10 @@ def train_with_config(args, opts):
             if 'epoch' in checkpoint:
                 st = checkpoint['epoch']
             if 'optimizer' in checkpoint and checkpoint['optimizer'] is not None:
-                optimizer.load_state_dict(checkpoint['optimizer'])
+                try:
+                    optimizer.load_state_dict(checkpoint['optimizer'])
+                except:
+                    print('This saved optimizer contains different parameters than my model. The optimizer will be reinitialized.')
             else:
                 print('WARNING: this checkpoint does not contain an optimizer state. The optimizer will be reinitialized.')
             
