@@ -418,6 +418,9 @@ class DSTformerv2(nn.Module):
         self.mask_token = nn.Parameter(torch.zeros(1, 1, dim_feat))
 
         self.proj_head = nn.Linear(int(0.5*dim_feat), dim_feat)
+
+
+        self.proj_head = nn.Linear(int(0.5*dim_feat), dim_feat)
         
         trunc_normal_(self.mask_token, std=.02)
 
@@ -609,7 +612,6 @@ class DSTformerv2(nn.Module):
         attn_maps = torch.zeros(B * F, J, J).cuda()
 
         if attention_map is not None and mask_drop:
-            #print("Doing mask dropping")
             x = x.permute(1, 0, 2)  #J , NMT, D
             J , NMT, D = x.shape
             x, _, ids_restore, _ = self.attention_guided_random_masking(x, attention_map, mask_ratio, tau)
@@ -662,6 +664,7 @@ class DSTformerv2(nn.Module):
         x = x.reshape(B, F, J, -1)
 
         if attention_map is not None and mask_drop:
+            #print("Doing mask dropping")
             x = self.proj_head(x)
 
         #print("before prelogits: ", x.shape)
@@ -672,8 +675,8 @@ class DSTformerv2(nn.Module):
         x = self.head(x)
         return x, attn_maps
 
-    def get_representation(self, x, j_importances=None, mask_drop = False):
-        return self.forward(x, return_rep=True, attention_map=j_importances, mask_drop = mask_drop)
+    def get_representation(self, x, j_importances=None, mask_drop=False):
+        return self.forward(x, return_rep=True, attention_map=j_importances, mask_drop=mask_drop)
 
 
 M,T,J,C = 4,243,17,3

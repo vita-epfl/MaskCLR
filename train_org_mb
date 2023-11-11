@@ -1,0 +1,29 @@
+#!/bin/bash
+#SBATCH --chdir /work/vita/os/
+#SBATCH --nodes 1
+#SBATCH --cpus-per-task 20
+
+#SBATCH --partition=gpu
+#SBATCH --qos=gpu
+#SBATCH --gres=gpu:2
+
+#SBATCH -o /home/abdelfat/MaskCLR-dev/slurm_out/MB_train_NTU60_xsub%j.out # STDOUT
+
+#SBATCH --ntasks-per-node=2
+#SBATCH --account=vita
+#SBATCH --mem 128G
+#SBATCH --time 72:00:00
+
+
+echo "fidis $HOSTNAME"
+
+conda init bash
+. /home/abdelfat/.bashrc
+conda activate /home/abdelfat/anaconda3/envs/ar
+
+nvidia-smi
+
+python /home/abdelfat/MaskCLR-dev/train_org_mb.py \
+    --config /home/abdelfat/MaskCLR-dev/configs/action/MB_train_NTU60_xsub.yaml \
+    --checkpoint /work/vita/os/exps/checkpoint/action/MB_train_NTU60_xsub \
+    --print_freq 100

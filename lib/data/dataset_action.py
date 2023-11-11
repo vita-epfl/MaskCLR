@@ -240,13 +240,13 @@ class ActionDataset(Dataset):
             
             motion = preprocess_data(sample, n_frames, self.is_train, noise = False)
 
-            motion_noisy = preprocess_data(sample, n_frames, self.is_train, noise = True)
+            #motion_noisy = preprocess_data(sample, n_frames, self.is_train, noise = True)
 
             motions[0].append(motion.astype(np.float32)) 
-            motions[1].append(motion_noisy.astype(np.float32)) 
+            #motions[1].append(motion_noisy.astype(np.float32)) 
             labels.append(sample['label'])
         self.motions = np.array(motions[0])
-        self.motions_noisy = np.array(motions[1])
+        #self.motions_noisy = np.array(motions[1])
         self.labels = np.array(labels)
         
         print("extracted %s items for %s!" % (len(self.labels), str(data_split)))
@@ -269,23 +269,23 @@ class NTURGBD(ActionDataset):
         #print("Sigma here is: ", sigma)
     def __getitem__(self, idx):
         'Generates one sample of data'
-        motion, motion_noisy, label = self.motions[idx],self.motions_noisy[idx], self.labels[idx] # (M,T,J,C)
+        motion, label = self.motions[idx], self.labels[idx] # (M,T,J,C)
 
         if self.random_move:
             motion = random_move(motion)
-            motion_noisy = random_move(motion_noisy)
+            #motion_noisy = random_move(motion_noisy)
         if self.scale_range:
             result = crop_scale(motion, scale_range=self.scale_range)
-            result_noisy = crop_scale(motion_noisy, scale_range=self.scale_range)
+            #result_noisy = crop_scale(motion_noisy, scale_range=self.scale_range)
         else:
             result = motion
-            result_noisy = motion_noisy
+            #result_noisy = motion_noisy
 
         #result = random_frame_mask(result, self.n_frames)
 
         #print("result.shape: ", result.shape)
 
-        return [[result.astype(np.float32), result_noisy.astype(np.float32)], label]
+        return [result.astype(np.float32), label]
     
 class NTURGBD1Shot(ActionDataset):
     def __init__(self, data_path, data_split, n_frames=243, random_move=True, scale_range=[1,1], check_split=False):

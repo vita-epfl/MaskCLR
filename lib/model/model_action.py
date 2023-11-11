@@ -223,9 +223,7 @@ class ActionNet(nn.Module):
         N, M, T, J, C = x.shape
 
         if self.reshape_input:
-            x = x.reshape(N*M, T, J, C)      
-
-        #print(x.shape)  
+            x = x.reshape(N*M, T, J, C)        
         feat, attn_maps = self.backbone.get_representation(x)
 
         
@@ -380,9 +378,7 @@ class ActionNetv2(nn.Module):
         N, M, T, J, C = x.shape
 
         if self.reshape_input:
-            x = x.reshape(N*M, T, J, C)  
-
-        #print(x.shape, j_importances)      
+            x = x.reshape(N*M, T, J, C)        
         feat, attn_maps = self.backbone.get_representation(x, j_importances, mask_drop=mask_drop)
 
         feat = feat.reshape([N, M, T, self.feat_J, -1])      # (N, M, T, J, C)
@@ -396,6 +392,8 @@ class MaskCLRv2(nn.Module):
                  version='class', hidden_dim=2048, num_joints=17, cam=False, arch= None, mask_th=0.2):
         super(MaskCLRv2, self).__init__()
         
+        
+
         self.n_branches = 2
 
         self.mask_th = mask_th
@@ -414,7 +412,7 @@ class MaskCLRv2(nn.Module):
         j_importances = []
         masked_inps = []
 
-        #N, M, T, J, C = inp.shape
+        N, M, T, J, C = inp.shape
         #mask = torch.ones(N, M, T, J, C).cuda()
 
         x = inp

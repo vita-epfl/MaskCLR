@@ -1,0 +1,35 @@
+#!/bin/bash
+#SBATCH --chdir /work/vita/os/
+#SBATCH --nodes 1
+#SBATCH --cpus-per-task 20
+
+#SBATCH --partition=gpu
+#SBATCH --qos=gpu
+#SBATCH --gres=gpu:2
+
+#SBATCH -o /home/abdelfat/MaskCLR-dev/slurm_out/maskclrv2_rmb_0.5cl%j.out # STDOUT
+
+#SBATCH --ntasks-per-node=2
+#SBATCH --account=vita
+#SBATCH --mem 128G
+#SBATCH --time 72:00:00
+
+
+echo "fidis $HOSTNAME"
+
+conda init bash
+. /home/abdelfat/.bashrc
+conda activate /home/abdelfat/anaconda3/envs/ar
+
+nvidia-smi
+
+python /home/abdelfat/MaskCLR-dev/train_maskclr.py \
+    --config /home/abdelfat/MaskCLR-dev/configs/mb/maskclrv2_train_NTU60_xsub.yaml \
+    --resume /home/abdelfat/MaskCLR/checkpoint/best_epoch_xsub_org.bin \
+    --checkpoint /work/vita/os/exps/checkpoint/maskclrv2_rmb_0.5cl \
+    --print_freq 100 \
+    --msk_path_start_epoch 0 \
+    --mask_th 0.2 \
+    --msk_type tm \
+    --cl_type cl \
+    --not_strict
