@@ -320,7 +320,7 @@ class MaskCLR(nn.Module):
         
         return mask
 
-    def forward(self, inp, inp_n):
+    def forward(self, inp):
         '''
             Input: (N, M x T x 17 x 3) 
         '''

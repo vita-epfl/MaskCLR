@@ -54,6 +54,18 @@ python /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/tra
 
 python train_maskclr.py \
     --config configs/mb/maskclrv2_train_NTU60_xsub.yaml \
+    --resume checkpoint/best_epoch_xsub_org.bin \
+    --checkpoint checkpoint/smart_masking_drop \
+    --print_freq 1 \
+    --msk_path_start_epoch 0 \
+    --mask_th 0.2 \
+    --msk_type tm \
+    --cl_type cl \
+    --chunk 100 \
+    --not_strict
+
+python train_maskclr.py \
+    --config configs/mb/maskclrv2_train_NTU60_xsub.yaml \
     --resume checkpoint/smart_masking/latest_epoch.bin \
     --checkpoint checkpoint/smart_masking \
     --print_freq 1 \
@@ -119,6 +131,7 @@ def parse_args():
     parser.add_argument('--mask_drop', default=False, action="store_true")
     parser.add_argument('--batch_size_override', default=None, type=int)
 
+    parser.add_argument('--not_strict', default=True, action="store_false")
     opts = parser.parse_args()
     return opts
 

@@ -419,6 +419,9 @@ class DSTformerv2(nn.Module):
 
         self.proj_head = nn.Linear(int(0.5*dim_feat), dim_feat)
 
+
+        self.proj_head = nn.Linear(int(0.5*dim_feat), dim_feat)
+        
         trunc_normal_(self.mask_token, std=.02)
 
         trunc_normal_(self.temp_embed, std=.02)
@@ -653,6 +656,9 @@ class DSTformerv2(nn.Module):
         x = self.norm(x)
 
         #print("after norm: ", x.shape)
+
+        
+
         #print("out shape: ", x.shape)   
 
         x = x.reshape(B, F, J, -1)
@@ -663,7 +669,7 @@ class DSTformerv2(nn.Module):
 
         #print("before prelogits: ", x.shape)
 
-        x = self.pre_logits(x)         # [B, F, J, dim_feat]
+        x = self.pre_logits(x)         # [B, F, J, dim_rep]
         if return_rep:
             return x, attn_maps
         x = self.head(x)
@@ -673,12 +679,12 @@ class DSTformerv2(nn.Module):
         return self.forward(x, return_rep=True, attention_map=j_importances, mask_drop=mask_drop)
 
 
-# M,T,J,C = 4,243,17,3
+M,T,J,C = 4,243,17,3
 
-# inp = torch.rand(M,T,J,C)
+inp = torch.rand(M,T,J,C)
 
-# model = DSTformerv2()
+model = DSTformerv2()
 
-# out, _ = model.get_representation (inp)
+out, _ = model.get_representation (inp)
 
-# print(out.shape)
+print(out.shape)
