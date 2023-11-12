@@ -27,13 +27,22 @@ np.random.seed(0)
 torch.manual_seed(0)
 
 """
-python /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/train_org_mb.py \
-    --config /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/configs/action/MB_train_NTU60_xsub.yaml \
-    --checkpoint /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/checkpoint/action/MB_train_NTU60_xsub \
-    --print_freq 1
+python train_org_mb.py \
+    --config configs/action/MB_train_NTU60_xsub.yaml \
+    --checkpoint checkpoint/of-60sub-maskclrv2 \
+    --pretrained /home/osabdelfattah/TCL/mb_pretrained/mb_pretrained_light.bin \
+    --print_freq 100 \
+    --of
 
 """
 
+def log_stuff(log_file, log):
+    print (log)
+    #if (not is_evaluate):
+    with open(log_file, "a") as myfile:
+        myfile.write(log + "\n")
+        myfile.flush()
+    myfile.close()
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -55,7 +64,7 @@ def parse_args():
     opts = parser.parse_args()
     return opts
 
-def validate(test_loader, model, criterion):
+def validate(test_loader, model, criterion, log_file_name):
     model.eval()
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -64,7 +73,7 @@ def validate(test_loader, model, criterion):
     with torch.no_grad():
         end = time.time()
         for idx, (batch_input, batch_gt) in (enumerate(test_loader)):
-            batch_input, _ = batch_input
+            batch_input = batch_input
             batch_size = len(batch_input)    
             if torch.cuda.is_available():
                 batch_gt = batch_gt.cuda()
@@ -84,17 +93,21 @@ def validate(test_loader, model, criterion):
             end = time.time()
 
             if (idx+1) % opts.print_freq == 0:
-                print('Test: [{0}/{1}]\t'
+                log = str('Test: [{0}/{1}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Acc@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                       'Acc@5 {top5.val:.3f} ({top5.avg:.3f})\t'.format(
                        idx, len(test_loader), batch_time=batch_time,
                        loss=losses, top1=top1, top5=top5))
+
+                log_stuff(log_file_name, log)
+                sys.stdout.flush()
     return losses.avg, top1.avg, top5.avg
 
 
 def train_with_config(args, opts):
+    log_file_name = opts.checkpoint + "/logs"+ ".txt"
     print(args)
     try:
         os.makedirs(opts.checkpoint)
@@ -146,11 +159,14 @@ def train_with_config(args, opts):
           'persistent_workers': True,
           'drop_last': True
     }
-    data_path = '/mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/datasets/ntu60/%s.pkl' % args.dataset
-    ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, random_move=args.random_move, scale_range=args.scale_range_train)
-    ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, random_move=False, scale_range=args.scale_range_test)
+    data_path = '/home/osabdelfattah/MaskCLR/datasets/ntu60/%s.pkl' % args.dataset
 
+    ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, \
+                                random_move=args.random_move, scale_range=args.scale_range_train, of=opts.of, chunk=opts.chunk)
     train_loader = DataLoader(ntu60_xsub_train, **trainloader_params)
+
+    ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, \
+                                random_move=False, scale_range=args.scale_range_test, chunk=opts.chunk)
     test_loader = DataLoader(ntu60_xsub_val, **testloader_params)
         
     chk_filename = os.path.join(opts.checkpoint, "latest_epoch.bin")
@@ -203,7 +219,7 @@ def train_with_config(args, opts):
             for idx, (batch_input, batch_gt) in (enumerate(train_loader)):    # (N, 2, T, 17, 3)
                 data_time.update(time.time() - end)
 
-                batch_input, _ = batch_input
+                batch_input = batch_input
 
                 batch_size = len(batch_input)
                 if torch.cuda.is_available():
@@ -222,20 +238,23 @@ def train_with_config(args, opts):
                 batch_time.update(time.time() - end)
                 end = time.time()
                 if (idx + 1) % opts.print_freq == 0:
-                    print('Train: [{0}][{1}/{2}]\t'
+                    log = str('Train: [{0}][{1}/{2}]\t'
                         'BT {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'DT {data_time.val:.3f} ({data_time.avg:.3f})\t'
                         'loss {loss.val:.3f} ({loss.avg:.3f})\t'
                         'Acc@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
                         epoch, idx + 1, len(train_loader), batch_time=batch_time,
                         data_time=data_time, loss=losses_train, top1=top1))
+                    log_stuff(log_file_name, log)
                     sys.stdout.flush()
                 
-            test_loss, test_top1, test_top5 = validate(test_loader, model, criterion)
+            test_loss, test_top1, test_top5 = validate(test_loader, model, criterion,log_file_name)
 
-            print('Overall test Loss {loss:.4f} \t'
+            log = ('Overall test Loss {loss:.4f} \t'
               'Acc@1 {top1:.3f} \t'
               'Acc@5 {top5:.3f} \t'.format(loss=test_loss, top1=test_top1, top5=test_top5))
+            
+            log_stuff(log_file_name, log)
 
             sys.stdout.flush()
                 
@@ -249,7 +268,12 @@ def train_with_config(args, opts):
             scheduler.step()
 
             # Save latest checkpoint.
-            chk_path = os.path.join(opts.checkpoint, 'latest_epoch.bin')
+            acc_name = ""
+            if test_top1 > 90:
+                acc_name = '_' + str(round(test_top1.item(),2))
+
+            chk_path = os.path.join(opts.checkpoint, 'latest_epoch%s.bin' % (acc_name).format(epoch))
+
             print('Saving checkpoint to', chk_path)
             torch.save({
                 'epoch': epoch+1,
@@ -261,6 +285,10 @@ def train_with_config(args, opts):
 
             # Save best checkpoint.
             best_chk_path = os.path.join(opts.checkpoint, 'best_epoch.bin'.format(epoch))
+
+            log = str("Prev. Best Test Top-1: " + str( best_acc))
+            log_stuff(log_file_name, log)
+
             if test_top1 > best_acc:
                 best_acc = test_top1
                 print("save best checkpoint")
@@ -271,9 +299,12 @@ def train_with_config(args, opts):
                 'model': model.state_dict(),
                 'best_acc' : best_acc
                 }, best_chk_path)
+            
+            log = str("Now Best Test Top-1: "+ str( best_acc))
+            log_stuff(log_file_name, log)
 
     if opts.evaluate:
-        test_loss, test_top1, test_top5 = validate(test_loader, model, criterion)
+        test_loss, test_top1, test_top5 = validate(test_loader, model, criterion,log_file_name)
         print('Loss {loss:.4f} \t'
               'Acc@1 {top1:.3f} \t'
               'Acc@5 {top5:.3f} \t'.format(loss=test_loss, top1=test_top1, top5=test_top5))

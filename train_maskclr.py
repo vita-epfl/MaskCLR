@@ -34,6 +34,18 @@ torch.manual_seed(0)
 python train_maskclr.py \
     --config configs/mb/maskclrv2_train_NTU60_xsub.yaml \
     --pretrained /home/osabdelfattah/TCL/mb_pretrained/mb_pretrained_light.bin \
+    --checkpoint checkpoint/of-60xsub \
+    --print_freq 100 \
+    --msk_path_start_epoch 10 \
+    --mask_th 0.2 \
+    --msk_type tm \
+    --cl_type tcl \
+    --not_strict \
+    --of
+
+python train_maskclr.py \
+    --config configs/mb/maskclrv2_train_NTU60_xsub.yaml \
+    --pretrained /home/osabdelfattah/TCL/mb_pretrained/mb_pretrained_light.bin \
     --checkpoint checkpoint/smart_masking \
     --print_freq 1 \
     --msk_path_start_epoch 10 \
@@ -41,6 +53,19 @@ python train_maskclr.py \
     --msk_type tm \
     --cl_type cl \
     --chunk 100 
+
+
+python /home/abdelfat/MaskCLR-dev/train_maskclr.py \
+    --config /home/abdelfat/MaskCLR-dev/configs/mb/maskclrv2_train_NTU60_xsub.yaml \
+    --resume /home/abdelfat/MaskCLR/checkpoint/best_epoch_xsub_org.bin \
+    --checkpoint /work/vita/os/exps/checkpoint/of-60xsub \
+    --print_freq 100 \
+    --msk_path_start_epoch 0 \
+    --mask_th 0.2 \
+    --msk_type tm \
+    --cl_type tcl \
+    --not_strict \
+    --of
 
 python /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/train_maskclr.py \
     --config /mnt/nas3_rcp_enac_u0900_vita_scratch/vita-staff/users/os/MaskCLR-dev/configs/mb/maskclrv2_train_NTU60_xsub.yaml \
@@ -518,7 +543,7 @@ def train_with_config(args, opts):
           'prefetch_factor': 4,
           'persistent_workers': True
     }
-    data_path = '/home/abdelfat/TCL/datasets/ntu60/Frames/%s.pkl' % args.dataset
+    data_path = '/home/osabdelfattah/TCL/datasets/ntu60/Frames/%s.pkl' % args.dataset
 
     if not opts.evaluate:
         

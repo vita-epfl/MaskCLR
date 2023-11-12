@@ -643,11 +643,11 @@ class DSTformerv2(nn.Module):
 
         #print(attn_maps.shape, torch.sum(attn_maps, axis=1).shape)
 
-        print("attn_maps before: ", attn_maps.shape)
+        #print("attn_maps before: ", attn_maps.shape)
 
         attn_maps = torch.sum(attn_maps, axis=1)#.softmax(dim=-1) # sum over dim 1 || 17 x 17 -> 17 x 1
         
-        print("output attention map: ", attn_maps.shape)
+        #print("output attention map: ", attn_maps.shape)
 
         ##print(attn_maps[0])
         ##print(attn_maps.shape)
@@ -682,12 +682,16 @@ class DSTformerv2(nn.Module):
         return self.forward(x, return_rep=True, attention_map=j_importances, mask_drop=mask_drop)
 
 
-M,T,J,C = 4,243,17,3
+# M,T,J,C = 4,243,17,3
 
-inp = torch.rand(M,T,J,C)
+# inp = torch.rand(M,T,J,C)
 
-model = DSTformerv2()
+# model = DSTformerv2()
 
-out, _ = model.get_representation (inp)
+# out, attn = model.get_representation (inp)
 
-print(out.shape)
+# print(out.shape)
+
+# out, _ = model.get_representation (inp, attn)
+
+# print(out.shape)
