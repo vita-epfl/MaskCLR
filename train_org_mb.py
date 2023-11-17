@@ -30,9 +30,14 @@ torch.manual_seed(0)
 python train_org_mb.py \
     --config configs/action/MB_train_NTU60_xsub.yaml \
     --checkpoint checkpoint/of-60sub-maskclrv2 \
+    --resume checkpoint/of-60sub-maskclrv2/latest_epoch.bin \
+    --print_freq 100
+
+python train_org_mb.py \
+    --config configs/action/MB_train_NTU60_xsub.yaml \
+    --checkpoint checkpoint/of-60sub-mb-org \
     --pretrained /home/osabdelfattah/TCL/mb_pretrained/mb_pretrained_light.bin \
-    --print_freq 100 \
-    --of
+    --print_freq 100
 
 """
 
@@ -79,7 +84,7 @@ def validate(test_loader, model, criterion, log_file_name):
                 batch_gt = batch_gt.cuda()
                 batch_input = batch_input.cuda()
             output, _,_,_ = model(batch_input)    # (N, num_classes)
-            output = output[0]
+            #output = output[0]
             loss = criterion(output, batch_gt)
 
             # update metric
@@ -120,16 +125,19 @@ def train_with_config(args, opts):
         if opts.resume or opts.evaluate:
             pass
         else:
-            chk_filename = os.path.join(opts.pretrained, opts.selection)
-            print('Loading backbone', chk_filename)
+            chk_filename = opts.pretrained #os.path.join(opts.pretrained, opts.selection)
+            log = str('Loading backbone ' + chk_filename)
+            log_stuff(log_file_name, log)
+            sys.stdout.flush()
+            
             checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)['model_pos']
             model_backbone = load_pretrained_weights(model_backbone, checkpoint)
     if args.partial_train:
         model_backbone = partial_train_layers(model_backbone, args.partial_train)
-    #model = ActionNet(backbone=model_backbone, dim_rep=args.dim_rep, num_classes=args.action_classes, dropout_ratio=args.dropout_ratio, version=args.model_version, hidden_dim=args.hidden_dim, num_joints=args.num_joints)
-    model = MaskCLRv2(backbone=model_backbone,dim_rep=args.dim_rep, num_classes=args.action_classes,\
-                            dropout_ratio=args.dropout_ratio, version=args.model_version, hidden_dim=args.hidden_dim,\
-                                num_joints=args.num_joints, arch=args.head_version, mask_th=opts.mask_th)
+    model = ActionNet(backbone=model_backbone, dim_rep=args.dim_rep, num_classes=args.action_classes, dropout_ratio=args.dropout_ratio, version=args.model_version, hidden_dim=args.hidden_dim, num_joints=args.num_joints)
+    # model = MaskCLRv2(backbone=model_backbone,dim_rep=args.dim_rep, num_classes=args.action_classes,\
+    #                         dropout_ratio=args.dropout_ratio, version=args.model_version, hidden_dim=args.hidden_dim,\
+    #                             num_joints=args.num_joints, arch=args.head_version, mask_th=opts.mask_th)
     criterion = torch.nn.CrossEntropyLoss()
     if torch.cuda.is_available():
         model = nn.DataParallel(model)
@@ -161,7 +169,7 @@ def train_with_config(args, opts):
     }
     data_path = '/home/osabdelfattah/MaskCLR/datasets/ntu60/%s.pkl' % args.dataset
 
-    ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, \
+    ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, \
                                 random_move=args.random_move, scale_range=args.scale_range_train, of=opts.of, chunk=opts.chunk)
     train_loader = DataLoader(ntu60_xsub_train, **trainloader_params)
 
@@ -174,7 +182,10 @@ def train_with_config(args, opts):
         opts.resume = chk_filename
     if opts.resume or opts.evaluate:
         chk_filename = opts.evaluate if opts.evaluate else opts.resume
-        print('Loading checkpoint', chk_filename)
+        log = str('Loading checkpoint ' + chk_filename)
+        log = log_stuff(log_file_name, log)
+        sys.stdout.flush()
+        
         checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)
         model.load_state_dict(checkpoint['model'], strict=True)
     
@@ -226,7 +237,7 @@ def train_with_config(args, opts):
                     batch_gt = batch_gt.cuda()
                     batch_input = batch_input.cuda()
                 output, _,_,_ = model(batch_input) # (N, num_classes)
-                output = output[0]
+                #output = output[0]
                 optimizer.zero_grad()
                 loss_train = criterion(output, batch_gt)
                 losses_train.update(loss_train.item(), batch_size)
@@ -274,7 +285,10 @@ def train_with_config(args, opts):
 
             chk_path = os.path.join(opts.checkpoint, 'latest_epoch%s.bin' % (acc_name).format(epoch))
 
-            print('Saving checkpoint to', chk_path)
+            log = str('Saving checkpoint to' + chk_path)
+            log_stuff(log_file_name, log)
+            sys.stdout.flush()
+
             torch.save({
                 'epoch': epoch+1,
                 'lr': scheduler.get_last_lr(),

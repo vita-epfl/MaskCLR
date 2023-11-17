@@ -1,5 +1,5 @@
 # General  
-finetune: False
+finetune: True
 partial_train: null
 
 # Traning 
